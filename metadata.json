@@ -1,0 +1,6 @@
+{
+  "name": "DuoClinic Odontologia Indaiatuba",
+  "description": "Odontologia moderna em Indaiatuba com Endodontia, estética dental, clínica geral e atendimento personalizado.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

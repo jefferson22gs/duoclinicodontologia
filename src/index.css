@@ -1,0 +1,41 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --font-serif: 'Cormorant Garamond', Georgia, serif;
+    --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  }
+  
+  html {
+    scroll-behavior: smooth;
+    font-family: var(--font-sans);
+  }
+
+  h1, h2, h3, h4, .font-serif-display {
+    font-family: var(--font-serif);
+  }
+}
+
+/* Custom Utilities for Premium Dental Aesthetic */
+.bg-warm-ivory { background-color: #F7F3EC; }
+.bg-surface-light { background-color: #FFFDF9; }
+.bg-soft-sand { background-color: #EEE6DB; }
+.bg-charcoal-dark { background-color: #1D1D1B; }
+
+.text-gold-champagne { color: #B08D57; }
+.border-gold-soft { border-color: rgba(176, 141, 87, 0.3); }
+
+.gold-gradient-text {
+  background: linear-gradient(135deg, #25231F 0%, #B08D57 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Hide scrollbar for clean carousel */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
