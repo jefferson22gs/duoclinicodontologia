@@ -1,6 +1,7 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { Shield, Sparkles, CheckCircle, HelpCircle, Calendar, Play, Pause, Volume2, VolumeX } from 'lucide-react';
 import { mediaAssets } from '../data/mediaAssets';
+import { notifyClinicalVideoState } from '../utils/videoEvents';
 
 interface EndodonticsFeatureProps {
   onOpenBooking: (serviceName?: string) => void;
@@ -21,6 +22,7 @@ export const EndodonticsFeature: React.FC<EndodonticsFeatureProps> = ({ onOpenBo
           if (!entry.isIntersecting && !video.paused) {
             video.pause();
             setIsPlaying(false);
+            notifyClinicalVideoState(false);
           }
         });
       },
@@ -38,8 +40,12 @@ export const EndodonticsFeature: React.FC<EndodonticsFeatureProps> = ({ onOpenBo
     if (isPlaying) {
       video.pause();
       setIsPlaying(false);
+      notifyClinicalVideoState(false);
     } else {
-      video.play().then(() => setIsPlaying(true)).catch(() => {});
+      video.play().then(() => {
+        setIsPlaying(true);
+        notifyClinicalVideoState(true);
+      }).catch(() => {});
     }
   };
 
@@ -151,7 +157,10 @@ export const EndodonticsFeature: React.FC<EndodonticsFeatureProps> = ({ onOpenBo
                   muted={isMuted}
                   preload="metadata"
                   className="w-full h-full object-cover"
-                  onEnded={() => setIsPlaying(false)}
+                  onEnded={() => {
+                    setIsPlaying(false);
+                    notifyClinicalVideoState(false);
+                  }}
                 />
 
                 {/* Sound Toggle */}

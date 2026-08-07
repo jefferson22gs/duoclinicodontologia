@@ -2,6 +2,7 @@ import React, { useRef, useState, useEffect } from 'react';
 import { mediaAssets } from '../data/mediaAssets';
 import { Play, Pause, Volume2, VolumeX, Maximize2, Sparkles, ShieldCheck, WifiOff, RefreshCw } from 'lucide-react';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
+import { notifyClinicalVideoState } from '../utils/videoEvents';
 
 interface ClinicalVideoShowcaseProps {
   onOpenBooking?: (serviceName?: string) => void;
@@ -75,6 +76,7 @@ export const ClinicalVideoShowcase: React.FC<ClinicalVideoShowcaseProps> = () =>
     if (playingId === id) {
       currentVideo.pause();
       setPlayingId(null);
+      notifyClinicalVideoState(false);
     } else {
       Object.entries(videoRefs.current).forEach(([k, v]) => {
         if (k !== id && v) {
@@ -83,6 +85,7 @@ export const ClinicalVideoShowcase: React.FC<ClinicalVideoShowcaseProps> = () =>
       });
       currentVideo.play().then(() => {
         setPlayingId(id);
+        notifyClinicalVideoState(true);
       }).catch(() => {
         // Handle autoplay block
       });
@@ -148,9 +151,15 @@ export const ClinicalVideoShowcase: React.FC<ClinicalVideoShowcaseProps> = () =>
                       muted={isMuted}
                       playsInline
                       preload="metadata"
-                      onEnded={() => setPlayingId(null)}
+                      onEnded={() => {
+                        setPlayingId(null);
+                        notifyClinicalVideoState(false);
+                      }}
                       onPause={() => {
-                        if (playingId === vid.id) setPlayingId(null);
+                        if (playingId === vid.id) {
+                          setPlayingId(null);
+                          notifyClinicalVideoState(false);
+                        }
                       }}
                       className="w-full h-full object-cover"
                     />

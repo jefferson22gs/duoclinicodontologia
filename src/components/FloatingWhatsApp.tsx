@@ -10,9 +10,10 @@ export const FloatingWhatsApp: React.FC<FloatingWhatsAppProps> = ({ onOpenBookin
 
   useEffect(() => {
     const handleScroll = () => {
-      setVisible(window.scrollY > 200);
+      const isPastThreshold = window.scrollY > 200;
+      setVisible((prev) => (prev !== isPastThreshold ? isPastThreshold : prev));
     };
-    window.addEventListener('scroll', handleScroll);
+    window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 

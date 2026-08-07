@@ -33,6 +33,8 @@ export interface MediaAssets {
   videos: {
     tourClinica: string;
     tourClinicaScroll: string;
+    tourClinicaScrollMobile: string;
+    tourClinicaScrollDesktop: string;
     tratamentoCanal: string;
     cirurgiaSiso: string;
   };
@@ -68,6 +70,8 @@ export const mediaAssets: MediaAssets = {
   videos: {
     tourClinica: '/assets/videos/tour_clinica.mp4',
     tourClinicaScroll: '/assets/videos/tour_clinica_scroll.mp4',
+    tourClinicaScrollMobile: '/assets/videos/tour_clinica_scroll_mobile.mp4',
+    tourClinicaScrollDesktop: '/assets/videos/tour_clinica_scroll_desktop.mp4',
     tratamentoCanal: '/assets/videos/tratamento_canal.mp4',
     cirurgiaSiso: '/assets/videos/cirurgia_siso.mp4',
   },

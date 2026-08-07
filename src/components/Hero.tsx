@@ -96,21 +96,21 @@ export const Hero: React.FC<HeroProps> = ({ onOpenBooking }) => {
               </div>
             </div>
 
-            {/* 6. Trust Badges Grid */}
-            <div className="pt-2 grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-              <div className="flex items-center gap-2 bg-white/5 p-3 rounded-2xl border border-white/10">
-                <div className="p-2 rounded-full bg-[#B08D57]/20 text-[#D8C5A5] shrink-0">
-                  <Star size={16} fill="#B08D57" className="text-[#B08D57]" />
+            {/* 6. Trust Badges Grid (Max 2 on mobile, 4 on desktop) */}
+            <div className="pt-2 grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs">
+              <div className="flex items-center gap-2 bg-white/5 p-2.5 sm:p-3 rounded-2xl border border-white/10">
+                <div className="p-1.5 rounded-full bg-[#B08D57]/20 text-[#D8C5A5] shrink-0">
+                  <Star size={15} fill="#B08D57" className="text-[#B08D57]" />
                 </div>
                 <div>
                   <div className="font-bold text-white text-xs">Avaliações</div>
-                  <div className="text-white/70 text-[11px]">Disponíveis no Google</div>
+                  <div className="text-white/70 text-[11px]">No Google</div>
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 bg-white/5 p-3 rounded-2xl border border-white/10">
-                <div className="p-2 rounded-full bg-[#B08D57]/20 text-[#D8C5A5] shrink-0">
-                  <ShieldCheck size={16} />
+              <div className="flex items-center gap-2 bg-white/5 p-2.5 sm:p-3 rounded-2xl border border-white/10">
+                <div className="p-1.5 rounded-full bg-[#B08D57]/20 text-[#D8C5A5] shrink-0">
+                  <ShieldCheck size={15} />
                 </div>
                 <div>
                   <div className="font-semibold text-white">Especializada</div>
@@ -118,9 +118,9 @@ export const Hero: React.FC<HeroProps> = ({ onOpenBooking }) => {
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 bg-white/5 p-3 rounded-2xl border border-white/10">
-                <div className="p-2 rounded-full bg-[#B08D57]/20 text-[#D8C5A5] shrink-0">
-                  <Heart size={16} />
+              <div className="hidden sm:flex items-center gap-2 bg-white/5 p-3 rounded-2xl border border-white/10">
+                <div className="p-1.5 rounded-full bg-[#B08D57]/20 text-[#D8C5A5] shrink-0">
+                  <Heart size={15} />
                 </div>
                 <div>
                   <div className="font-semibold text-white">Individualizado</div>
@@ -128,9 +128,9 @@ export const Hero: React.FC<HeroProps> = ({ onOpenBooking }) => {
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 bg-white/5 p-3 rounded-2xl border border-white/10">
-                <div className="p-2 rounded-full bg-[#B08D57]/20 text-[#D8C5A5] shrink-0">
-                  <ShieldCheck size={16} />
+              <div className="hidden sm:flex items-center gap-2 bg-white/5 p-3 rounded-2xl border border-white/10">
+                <div className="p-1.5 rounded-full bg-[#B08D57]/20 text-[#D8C5A5] shrink-0">
+                  <ShieldCheck size={15} />
                 </div>
                 <div>
                   <div className="font-semibold text-white">Organizado</div>

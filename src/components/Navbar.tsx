@@ -14,9 +14,10 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenBooking }) => {
 
   useEffect(() => {
     const handleScroll = () => {
-      setIsScrolled(window.scrollY > 20);
+      const nextScrolled = window.scrollY > 20;
+      setIsScrolled((prev) => (prev !== nextScrolled ? nextScrolled : prev));
     };
-    window.addEventListener('scroll', handleScroll);
+    window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
@@ -118,23 +119,21 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenBooking }) => {
               </button>
             </div>
 
-            {/* Mobile / Tablet Hamburger Button (below xl) */}
-            <div className="flex xl:hidden items-center gap-2.5">
-              <PWAInstallButton variant="navbar" />
-
+            {/* Mobile / Tablet Controls (below xl) */}
+            <div className="flex xl:hidden items-center gap-2">
               <button
                 onClick={() => onOpenBooking()}
                 type="button"
-                className="bg-[#B08D57] text-white px-3.5 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1.5 shadow-sm"
+                className="bg-[#B08D57] text-white px-3.5 py-2 min-h-[44px] rounded-full text-xs font-semibold flex items-center justify-center gap-1.5 shadow-sm active:scale-95 transition-transform"
               >
                 <Calendar size={14} />
-                <span className="hidden sm:inline">Agendar</span>
+                <span>Agendar</span>
               </button>
 
               <button
                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
                 type="button"
-                className={`p-2 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-[#B08D57] ${
+                className={`p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl transition-colors focus:outline-none focus:ring-2 focus:ring-[#B08D57] ${
                   isScrolled ? 'text-[#25231F]' : 'text-white'
                 }`}
                 aria-label={mobileMenuOpen ? 'Fechar menu' : 'Abrir menu de navegação'}

@@ -13,6 +13,7 @@ interface ServicesProps {
 export const Services: React.FC<ServicesProps> = ({ onOpenBooking }) => {
   const [activeCategory, setActiveCategory] = useState<string>('todos');
   const [selectedService, setSelectedService] = useState<Service | null>(null);
+  const [showAllMobileServices, setShowAllMobileServices] = useState(false);
 
   const renderIcon = (iconName: string) => {
     switch (iconName) {
@@ -78,58 +79,89 @@ export const Services: React.FC<ServicesProps> = ({ onOpenBooking }) => {
         </div>
 
         {/* Services Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {filteredServices.map((service) => (
-            <div
-              key={service.id}
-              className="bg-[#F7F3EC] p-8 rounded-3xl border border-[#25231F]/5 hover:border-[#B08D57]/40 shadow-sm hover:shadow-md transition-all flex flex-col justify-between group"
-            >
-              <div>
-                <div className="w-14 h-14 rounded-2xl bg-[#FFFDF9] text-[#B08D57] border border-[#25231F]/5 flex items-center justify-center mb-6 group-hover:scale-105 transition-transform">
-                  {renderIcon(service.iconName)}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
+          {filteredServices.map((service, idx) => {
+            const isHiddenOnMobile = !showAllMobileServices && idx >= 4;
+
+            return (
+              <div
+                key={service.id}
+                className={`bg-[#F7F3EC] p-6 sm:p-8 rounded-3xl border border-[#25231F]/5 hover:border-[#B08D57]/40 shadow-sm hover:shadow-md transition-all flex-col justify-between group ${
+                  isHiddenOnMobile ? 'hidden md:flex' : 'flex'
+                }`}
+              >
+                <div>
+                  <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-[#FFFDF9] text-[#B08D57] border border-[#25231F]/5 flex items-center justify-center mb-5 group-hover:scale-105 transition-transform">
+                    {renderIcon(service.iconName)}
+                  </div>
+
+                  <div className="text-[11px] sm:text-xs font-semibold text-[#B08D57] uppercase tracking-wider mb-1.5">
+                    {service.category.replace('_', ' ')}
+                  </div>
+
+                  <h3 className="font-serif text-xl sm:text-2xl font-bold text-[#1D1D1B] mb-2.5 group-hover:text-[#B08D57] transition-colors">
+                    {service.title}
+                  </h3>
+
+                  <p className="text-xs sm:text-sm text-[#25231F]/75 leading-relaxed mb-5">
+                    {service.shortDescription}
+                  </p>
+
+                  <div className="space-y-2 mb-6">
+                    {service.benefits.slice(0, 3).map((b, bIdx) => (
+                      <div key={bIdx} className="flex items-center gap-2 text-xs text-[#25231F]/80">
+                        <div className="w-1.5 h-1.5 rounded-full bg-[#B08D57] shrink-0" />
+                        <span>{b}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
 
-                <div className="text-xs font-semibold text-[#B08D57] uppercase tracking-wider mb-2">
-                  {service.category.replace('_', ' ')}
-                </div>
+                <div className="pt-4 border-t border-[#25231F]/10 flex items-center justify-between gap-2">
+                  <button
+                    onClick={() => setSelectedService(service)}
+                    type="button"
+                    className="text-xs font-semibold text-[#1D1D1B] hover:text-[#B08D57] flex items-center gap-1 min-h-[44px] py-2"
+                  >
+                    <span>Detalhes</span>
+                    <ChevronRight size={14} />
+                  </button>
 
-                <h3 className="font-serif text-2xl font-bold text-[#1D1D1B] mb-3 group-hover:text-[#B08D57] transition-colors">
-                  {service.title}
-                </h3>
-
-                <p className="text-sm text-[#25231F]/75 leading-relaxed mb-6">
-                  {service.shortDescription}
-                </p>
-
-                <div className="space-y-2 mb-8">
-                  {service.benefits.slice(0, 3).map((b, idx) => (
-                    <div key={idx} className="flex items-center gap-2 text-xs text-[#25231F]/80">
-                      <div className="w-1.5 h-1.5 rounded-full bg-[#B08D57]" />
-                      <span>{b}</span>
-                    </div>
-                  ))}
+                  <button
+                    onClick={() => onOpenBooking(service.title)}
+                    type="button"
+                    className="bg-[#B08D57] hover:bg-[#977747] text-white px-4 py-2.5 min-h-[44px] rounded-full text-xs font-semibold shadow-sm transition-all flex items-center justify-center"
+                  >
+                    Agendar
+                  </button>
                 </div>
               </div>
-
-              <div className="pt-4 border-t border-[#25231F]/10 flex items-center justify-between gap-2">
-                <button
-                  onClick={() => setSelectedService(service)}
-                  className="text-xs font-semibold text-[#1D1D1B] hover:text-[#B08D57] flex items-center gap-1"
-                >
-                  <span>Detalhes completos</span>
-                  <ChevronRight size={14} />
-                </button>
-
-                <button
-                  onClick={() => onOpenBooking(service.title)}
-                  className="bg-[#B08D57] hover:bg-[#977747] text-white px-4 py-2 rounded-full text-xs font-semibold shadow-sm transition-all"
-                >
-                  Agendar
-                </button>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
+
+        {/* Mobile Toggle Button for Full Services List */}
+        {filteredServices.length > 4 && (
+          <div className="mt-8 text-center md:hidden">
+            <button
+              onClick={() => setShowAllMobileServices((prev) => !prev)}
+              type="button"
+              className="inline-flex items-center justify-center gap-2 bg-[#F7F3EC] hover:bg-[#EEE6DB] text-[#1D1D1B] border border-[#25231F]/10 px-6 py-3.5 rounded-full text-xs font-semibold shadow-sm min-h-[44px] transition-all"
+            >
+              <span>
+                {showAllMobileServices
+                  ? 'Recolher tratamentos'
+                  : `Ver todos os ${filteredServices.length} tratamentos`}
+              </span>
+              <ChevronRight
+                size={16}
+                className={`transition-transform duration-200 ${
+                  showAllMobileServices ? '-rotate-90' : 'rotate-90'
+                }`}
+              />
+            </button>
+          </div>
+        )}
 
       </div>
 

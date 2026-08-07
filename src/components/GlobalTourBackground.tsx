@@ -6,20 +6,39 @@ import { useOnlineStatus } from '../hooks/useOnlineStatus';
 export const GlobalTourBackground: React.FC = () => {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const rafId = useRef<number | null>(null);
+
+  // Engine Refs (Transient state - NO React re-renders during scroll)
+  const targetProgressRef = useRef<number>(0);
+  const rafScheduledRef = useRef<boolean>(false);
+  const pendingSeekRef = useRef<number | null>(null);
+  const scrollMaxRef = useRef<number>(1);
+  const isSeekingRef = useRef<boolean>(false);
 
   const { isOnline } = useOnlineStatus();
 
+  // Component UI State
   const [isLoaded, setIsLoaded] = useState(false);
   const [hasError, setHasError] = useState(false);
   const [isPausedByUser, setIsPausedByUser] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const [currentTimeFormatted, setCurrentTimeFormatted] = useState('00:00');
-  const [durationFormatted, setDurationFormatted] = useState('01:30');
+  const [isClinicalVideoPlaying, setIsClinicalVideoPlaying] = useState(false);
+  const [isMobileDevice, setIsMobileDevice] = useState(false);
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
   const [saveData, setSaveData] = useState(false);
 
-  // Check reduced motion & data saver preferences
+  // Detect mobile device & viewport size
+  useEffect(() => {
+    const checkMobile = () => {
+      const isMobileWidth = window.innerWidth < 768;
+      const isCoarsePointer = window.matchMedia('(pointer: coarse)').matches;
+      setIsMobileDevice(isMobileWidth || isCoarsePointer);
+    };
+
+    checkMobile();
+    window.addEventListener('resize', checkMobile, { passive: true });
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  // Detect motion preferences & data saver
   useEffect(() => {
     const motionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
     setPrefersReducedMotion(motionQuery.matches);
@@ -27,68 +46,185 @@ export const GlobalTourBackground: React.FC = () => {
     const handleMotionChange = (e: MediaQueryListEvent) => setPrefersReducedMotion(e.matches);
     motionQuery.addEventListener('change', handleMotionChange);
 
-    if ('connection' in navigator && (navigator as unknown as { connection?: { saveData?: boolean } }).connection?.saveData) {
+    if (
+      'connection' in navigator &&
+      (navigator as unknown as { connection?: { saveData?: boolean } }).connection?.saveData
+    ) {
       setSaveData(true);
     }
 
     return () => motionQuery.removeEventListener('change', handleMotionChange);
   }, []);
 
-  // Format seconds into MM:SS
-  const formatTime = (seconds: number) => {
-    if (isNaN(seconds) || seconds <= 0) return '00:00';
-    const mins = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-  };
+  // Calculate scroll limits safely (Only on resize / layout change)
+  const updateScrollMax = useCallback(() => {
+    const docHeight = Math.max(
+      document.documentElement.scrollHeight,
+      document.body.scrollHeight,
+      1
+    );
+    const winHeight = window.innerHeight || 1;
+    scrollMaxRef.current = Math.max(docHeight - winHeight, 1);
+  }, []);
 
-  // Synchronize whole page scroll with video currentTime
-  const syncScrollToVideo = useCallback(() => {
+  useEffect(() => {
+    updateScrollMax();
+
+    const handleResize = () => updateScrollMax();
+    window.addEventListener('resize', handleResize, { passive: true });
+    window.addEventListener('orientationchange', handleResize, { passive: true });
+
+    // ResizeObserver for dynamic content height changes
+    let resizeObserver: ResizeObserver | null = null;
+    if (typeof ResizeObserver !== 'undefined') {
+      resizeObserver = new ResizeObserver(() => updateScrollMax());
+      resizeObserver.observe(document.body);
+    }
+
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('orientationchange', handleResize);
+      if (resizeObserver) resizeObserver.disconnect();
+    };
+  }, [updateScrollMax]);
+
+  // Listen for Clinical Video Playback Events (Dual-Video Protection)
+  useEffect(() => {
+    const handleClinicalVideoState = (e: Event) => {
+      const customEvent = e as CustomEvent<{ isPlaying: boolean }>;
+      const isPlaying = customEvent.detail?.isPlaying ?? false;
+      setIsClinicalVideoPlaying(isPlaying);
+
+      const video = videoRef.current;
+      if (video && isPlaying && !video.paused) {
+        video.pause();
+      }
+    };
+
+    window.addEventListener('duoclinic-clinical-video-state', handleClinicalVideoState);
+    return () => {
+      window.removeEventListener('duoclinic-clinical-video-state', handleClinicalVideoState);
+    };
+  }, []);
+
+  // Core Video Frame Update (Called via RAF on scroll demand - ZERO infinite loops)
+  const processFrameUpdate = useCallback(() => {
+    rafScheduledRef.current = false;
+
     const video = videoRef.current;
-    if (!video || !video.duration || isNaN(video.duration) || isPausedByUser || prefersReducedMotion || saveData || !isOnline) {
+    if (
+      !video ||
+      isPausedByUser ||
+      isClinicalVideoPlaying ||
+      document.hidden ||
+      !isOnline ||
+      prefersReducedMotion ||
+      saveData
+    ) {
       return;
     }
 
-    const scrollY = window.scrollY || window.pageYOffset || 0;
-    const docHeight = document.documentElement.scrollHeight || document.body.scrollHeight;
-    const winHeight = window.innerHeight || 1;
-    const maxScroll = Math.max(docHeight - winHeight, 1);
-
-    const rawProgress = scrollY / maxScroll;
-    const clampedProgress = Math.min(Math.max(rawProgress, 0), 1);
-
-    const targetTime = clampedProgress * (video.duration - 0.1);
-
-    if (Math.abs(video.currentTime - targetTime) > 0.04) {
-      video.currentTime = targetTime;
+    const duration = video.duration;
+    if (!duration || isNaN(duration) || video.readyState < 2) {
+      return;
     }
 
-    if (Math.abs(clampedProgress - progress) > 0.01) {
-      setProgress(clampedProgress);
-      setCurrentTimeFormatted(formatTime(targetTime));
-    }
-  }, [isPausedByUser, prefersReducedMotion, saveData, progress, isOnline]);
+    const targetTime = Math.min(Math.max(targetProgressRef.current * duration, 0), duration - 0.05);
 
+    // Tolerance check (>= 0.12 seconds to prevent micro-seeks)
+    if (Math.abs(video.currentTime - targetTime) < 0.12) {
+      return;
+    }
+
+    // Concurrent Seek Guard
+    if (video.seeking || isSeekingRef.current) {
+      pendingSeekRef.current = targetTime;
+      return;
+    }
+
+    try {
+      isSeekingRef.current = true;
+      if ('fastSeek' in video && typeof video.fastSeek === 'function') {
+        video.fastSeek(targetTime);
+      } else {
+        video.currentTime = targetTime;
+      }
+      pendingSeekRef.current = null;
+    } catch {
+      isSeekingRef.current = false;
+    }
+  }, [isPausedByUser, isClinicalVideoPlaying, isOnline, prefersReducedMotion, saveData]);
+
+  // Handle Seek Completion Event
+  const handleSeeked = () => {
+    isSeekingRef.current = false;
+    const video = videoRef.current;
+
+    if (pendingSeekRef.current !== null && video) {
+      const nextTarget = pendingSeekRef.current;
+      pendingSeekRef.current = null;
+
+      if (Math.abs(video.currentTime - nextTarget) >= 0.12) {
+        try {
+          isSeekingRef.current = true;
+          if ('fastSeek' in video && typeof video.fastSeek === 'function') {
+            video.fastSeek(nextTarget);
+          } else {
+            video.currentTime = nextTarget;
+          }
+        } catch {
+          isSeekingRef.current = false;
+        }
+      }
+    }
+  };
+
+  // Passive Scroll Listener (Demand-driven RAF scheduling)
   useEffect(() => {
-    const loop = () => {
-      syncScrollToVideo();
-      rafId.current = requestAnimationFrame(loop);
+    if (isPausedByUser || isClinicalVideoPlaying || !isOnline || prefersReducedMotion || saveData) {
+      return;
+    }
+
+    const handleScroll = () => {
+      const scrollY = window.scrollY || window.pageYOffset || 0;
+      targetProgressRef.current = Math.min(Math.max(scrollY / scrollMaxRef.current, 0), 1);
+
+      if (!rafScheduledRef.current) {
+        rafScheduledRef.current = true;
+        requestAnimationFrame(processFrameUpdate);
+      }
     };
 
-    rafId.current = requestAnimationFrame(loop);
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    // Trigger initial calculation once
+    handleScroll();
 
     return () => {
-      if (rafId.current) cancelAnimationFrame(rafId.current);
+      window.removeEventListener('scroll', handleScroll);
     };
-  }, [syncScrollToVideo]);
+  }, [
+    isPausedByUser,
+    isClinicalVideoPlaying,
+    isOnline,
+    prefersReducedMotion,
+    saveData,
+    processFrameUpdate,
+  ]);
+
+  // Visibility change listener
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.hidden && videoRef.current) {
+        videoRef.current.pause();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, []);
 
   const handleLoadedMetadata = () => {
-    const video = videoRef.current;
-    if (video) {
-      setIsLoaded(true);
-      setDurationFormatted(formatTime(video.duration));
-      syncScrollToVideo();
-    }
+    setIsLoaded(true);
   };
 
   const handleError = () => {
@@ -99,88 +235,95 @@ export const GlobalTourBackground: React.FC = () => {
     setIsPausedByUser((prev) => !prev);
   };
 
+  const videoSource = isMobileDevice
+    ? mediaAssets.videos.tourClinicaScrollMobile
+    : mediaAssets.videos.tourClinicaScrollDesktop;
+
   return (
     <div
       ref={containerRef}
       className="fixed inset-0 w-full h-[100dvh] z-0 pointer-events-none overflow-hidden select-none"
       aria-hidden="true"
     >
-      {/* Background Static Blur Fill (Poster) */}
+      {/* Background Poster Overlay */}
       <div
-        className="absolute inset-0 bg-cover bg-center scale-105 filter blur-3xl opacity-40 transition-opacity duration-1000"
+        className="absolute inset-0 bg-cover bg-center opacity-30 transition-opacity duration-1000"
         style={{ backgroundImage: `url(${mediaAssets.clinic.recepcaoPrincipal})` }}
       />
 
-      {/* Main Single Tour Video Instance */}
+      {/* Video Background Layer */}
       {isOnline && !hasError && !prefersReducedMotion && !saveData ? (
         <div className="absolute inset-0 flex items-center justify-center">
           <div className="relative w-full h-full max-w-[760px] md:w-[clamp(480px,46vw,760px)] mx-auto flex items-center justify-center">
             <video
               ref={videoRef}
-              src={mediaAssets.videos.tourClinicaScroll}
+              src={videoSource}
               poster={mediaAssets.clinic.recepcaoPrincipal}
               muted
               playsInline
               preload="metadata"
               onLoadedMetadata={handleLoadedMetadata}
+              onSeeked={handleSeeked}
               onError={handleError}
               className="w-full h-full object-cover md:object-contain transition-opacity duration-700"
               style={{
-                opacity: isLoaded ? 0.85 : 0.4,
-                WebkitMaskImage:
-                  'radial-gradient(circle at center, rgba(0,0,0,1) 50%, rgba(0,0,0,0.8) 80%, rgba(0,0,0,0) 100%)',
-                maskImage:
-                  'radial-gradient(circle at center, rgba(0,0,0,1) 50%, rgba(0,0,0,0.8) 80%, rgba(0,0,0,0) 100%)',
+                opacity: isLoaded ? (isClinicalVideoPlaying ? 0.2 : 0.8) : 0.4,
+                ...(isMobileDevice
+                  ? {}
+                  : {
+                      WebkitMaskImage:
+                        'radial-gradient(circle at center, rgba(0,0,0,1) 50%, rgba(0,0,0,0.8) 80%, rgba(0,0,0,0) 100%)',
+                      maskImage:
+                        'radial-gradient(circle at center, rgba(0,0,0,1) 50%, rgba(0,0,0,0.8) 80%, rgba(0,0,0,0) 100%)',
+                    }),
               }}
             />
           </div>
         </div>
       ) : (
-        /* Fallback Static Poster Image when offline or error */
+        /* Fallback Static Poster Image */
         <img
           src={mediaAssets.clinic.recepcaoPrincipal}
           alt=""
-          className="absolute inset-0 w-full h-full object-cover opacity-30 filter brightness-90"
+          className="absolute inset-0 w-full h-full object-cover opacity-25 filter brightness-90"
         />
       )}
 
-      {/* Global Atmosphere Lighting & Radial Scrims */}
-      <div className="absolute inset-0 bg-gradient-to-b from-[#181613]/80 via-transparent to-[#181613]/90 pointer-events-none" />
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_transparent_30%,_rgba(24,22,19,0.65)_100%)] pointer-events-none" />
-      <div className="absolute inset-0 bg-gradient-to-tr from-[#B08D57]/10 via-transparent to-[#D8C5A5]/10 pointer-events-none mix-blend-overlay" />
+      {/* Global Scrims */}
+      <div className="absolute inset-0 bg-gradient-to-b from-[#181613]/85 via-[#181613]/50 to-[#181613]/90 pointer-events-none" />
 
-      {/* Discrete Interactive Controls & Offline Video Badge */}
-      <div className="absolute bottom-6 right-6 z-20 pointer-events-auto flex items-center gap-3">
+      {/* Controls positioned at bottom-left to avoid FloatingWhatsApp collision (bottom-right) */}
+      <div className="absolute bottom-6 left-6 z-20 pointer-events-auto flex items-center gap-3">
         {!isOnline ? (
           <div className="flex items-center gap-2 bg-[#1D1D1B]/90 px-3.5 py-2 rounded-full text-xs text-[#D8C5A5] backdrop-blur-md border border-[#B08D57]/30 shadow-xl">
             <WifiOff size={14} className="text-amber-400" />
-            <span>O vídeo estará disponível quando a conexão retornar.</span>
+            <span>Vídeo em segundo plano pausado offline.</span>
           </div>
         ) : (
           <>
             <button
               onClick={toggleUserPause}
               type="button"
-              className="bg-[#1D1D1B]/80 hover:bg-[#1D1D1B] text-[#D8C5A5] hover:text-white px-3.5 py-2 rounded-full text-xs font-semibold backdrop-blur-md border border-white/15 shadow-xl transition-all flex items-center gap-2"
-              title={isPausedByUser ? 'Retomar animação no fundo' : 'Pausar animação no fundo'}
+              className="bg-[#1D1D1B]/85 hover:bg-[#1D1D1B] text-[#D8C5A5] hover:text-white px-3.5 py-2 rounded-full text-xs font-semibold border border-white/15 shadow-xl transition-all flex items-center gap-2 focus:ring-2 focus:ring-[#B08D57]"
+              title={isPausedByUser ? 'Retomar fundo animado' : 'Pausar fundo animado'}
               aria-label={isPausedByUser ? 'Retomar fundo animado' : 'Pausar fundo animado'}
             >
               {isPausedByUser ? (
                 <>
                   <Play size={13} fill="currentColor" />
-                  <span className="hidden sm:inline">Retomar Fundo</span>
+                  <span>Retomar Fundo</span>
                 </>
               ) : (
                 <>
                   <Pause size={13} fill="currentColor" />
-                  <span className="hidden sm:inline">Pausar Fundo</span>
+                  <span>Pausar Fundo</span>
                 </>
               )}
             </button>
 
-            <div className="hidden md:flex items-center gap-2 bg-[#1D1D1B]/80 px-3.5 py-2 rounded-full text-[11px] font-mono text-[#D8C5A5] backdrop-blur-md border border-white/15 shadow-xl">
+            <div className="hidden lg:flex items-center gap-2 bg-[#1D1D1B]/85 px-3.5 py-2 rounded-full text-[11px] font-mono text-[#D8C5A5] border border-white/15 shadow-xl">
               <Compass size={13} className="text-[#B08D57]" />
-              <span>TOUR DUOCLINIC • {currentTimeFormatted} / {durationFormatted}</span>
+              <span>TOUR DUOCLINIC</span>
             </div>
           </>
         )}
