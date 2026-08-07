@@ -13,18 +13,8 @@ export default defineConfig(() => {
         registerType: 'prompt',
         injectRegister: 'auto',
         scope: '/',
-        includeAssets: [
-          'favicon.ico',
-          'favicon-16x16.png',
-          'favicon-32x32.png',
-          'apple-touch-icon.png',
-          'icons/pwa-192x192.png',
-          'icons/pwa-512x512.png',
-          'icons/pwa-maskable-192x192.png',
-          'icons/pwa-maskable-512x512.png',
-          'screenshots/duoclinic-desktop.png',
-          'screenshots/duoclinic-mobile.png',
-        ],
+        manifestFilename: 'manifest.json',
+        includeAssets: [],
         manifest: {
           name: 'DuoClinic Odontologia',
           short_name: 'DuoClinic',
@@ -90,26 +80,19 @@ export default defineConfig(() => {
               icons: [{ src: 'icons/pwa-192x192.png', sizes: '192x192' }],
             },
           ],
-          screenshots: [
-            {
-              src: 'screenshots/duoclinic-desktop.png',
-              sizes: '1280x720',
-              type: 'image/png',
-              form_factor: 'wide',
-              label: 'DuoClinic Odontologia - Visão Geral em Indaiatuba',
-            },
-            {
-              src: 'screenshots/duoclinic-mobile.png',
-              sizes: '390x844',
-              type: 'image/png',
-              form_factor: 'narrow',
-              label: 'DuoClinic Odontologia - Agendamento no Celular',
-            },
-          ],
         },
         workbox: {
           globPatterns: ['**/*.{js,css,html,ico,png,svg,webp,avif,woff,woff2,json}'],
-          globIgnores: ['**/*.mp4', '**/videos/**', '**/tour_clinica.mp4', '**/tratamento_canal.mp4', '**/cirurgia_siso.mp4'],
+          globIgnores: [
+            '**/*.mp4',
+            '**/videos/**',
+            '**/tour_clinica.mp4',
+            '**/tratamento_canal.mp4',
+            '**/cirurgia_siso.mp4',
+            '**/icons/**',
+            '**/screenshots/**',
+            'manifest.json',
+          ],
           maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
           navigateFallback: '/index.html',
           navigateFallbackDenylist: [/^\/api\//],
@@ -127,18 +110,6 @@ export default defineConfig(() => {
                 url.hostname.includes('wa.me') ||
                 url.hostname.includes('gstatic.com'),
               handler: 'NetworkOnly',
-            },
-            {
-              urlPattern: ({ request }) => request.mode === 'navigate',
-              handler: 'NetworkFirst',
-              options: {
-                networkTimeoutSeconds: 3,
-                cacheName: 'duoclinic-html-cache',
-                expiration: {
-                  maxEntries: 10,
-                  maxAgeSeconds: 24 * 60 * 60,
-                },
-              },
             },
             {
               urlPattern: ({ request }) => request.destination === 'image',
