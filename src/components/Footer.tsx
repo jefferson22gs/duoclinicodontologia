@@ -2,12 +2,13 @@ import React from 'react';
 import { clinicConfig } from '../data/clinicData';
 import { mediaAssets } from '../data/mediaAssets';
 import { Instagram, MapPin, Phone, ShieldCheck } from 'lucide-react';
+import { PWAInstallButton } from './pwa/PWAInstallButton';
 
 export const Footer: React.FC = () => {
   const currentYear = new Date().getFullYear();
 
   return (
-    <footer className="bg-[#1D1D1B] text-white pt-16 pb-12 border-t border-white/10 relative z-10">
+    <footer className="bg-[#1D1D1B] text-white pt-16 pb-12 border-t border-white/10 relative z-10 pb-[calc(3rem+env(safe-area-inset-bottom,0px))]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-10 pb-12 border-b border-white/10">
@@ -37,6 +38,10 @@ export const Footer: React.FC = () => {
             <p className="text-xs text-white/60 leading-relaxed max-w-sm">
               Odontologia moderna em Indaiatuba combinando Endodontia especializada, dentística estética, odontopediatria, avaliação preventiva e atendimento humano.
             </p>
+
+            <div className="pt-2">
+              <PWAInstallButton variant="footer" />
+            </div>
           </div>
 
           {/* Quick Links */}

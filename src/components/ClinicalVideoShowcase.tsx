@@ -1,6 +1,11 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { mediaAssets } from '../data/mediaAssets';
-import { Play, Pause, Volume2, VolumeX, Maximize2, Sparkles, ShieldCheck } from 'lucide-react';
+import { Play, Pause, Volume2, VolumeX, Maximize2, Sparkles, ShieldCheck, WifiOff, RefreshCw } from 'lucide-react';
+import { useOnlineStatus } from '../hooks/useOnlineStatus';
+
+interface ClinicalVideoShowcaseProps {
+  onOpenBooking?: (serviceName?: string) => void;
+}
 
 interface ClinicalVideo {
   id: string;
@@ -11,8 +16,9 @@ interface ClinicalVideo {
   badge: string;
 }
 
-export const ClinicalVideoShowcase: React.FC = () => {
+export const ClinicalVideoShowcase: React.FC<ClinicalVideoShowcaseProps> = () => {
   const videoRefs = useRef<{ [key: string]: HTMLVideoElement | null }>({});
+  const { isOnline } = useOnlineStatus();
 
   const [playingId, setPlayingId] = useState<string | null>(null);
   const [mutedStates, setMutedStates] = useState<{ [key: string]: boolean }>({
@@ -46,7 +52,7 @@ export const ClinicalVideoShowcase: React.FC = () => {
         entries.forEach((entry) => {
           if (!entry.isIntersecting) {
             const videoEl = entry.target as HTMLVideoElement;
-            videoEl.pause();
+            if (videoEl && videoEl.pause) videoEl.pause();
           }
         });
       },
@@ -61,6 +67,8 @@ export const ClinicalVideoShowcase: React.FC = () => {
   }, []);
 
   const handlePlayToggle = (id: string) => {
+    if (!isOnline) return;
+
     const currentVideo = videoRefs.current[id];
     if (!currentVideo) return;
 
@@ -68,7 +76,6 @@ export const ClinicalVideoShowcase: React.FC = () => {
       currentVideo.pause();
       setPlayingId(null);
     } else {
-      // Pause other videos
       Object.entries(videoRefs.current).forEach(([k, v]) => {
         if (k !== id && v) {
           (v as HTMLVideoElement).pause();
@@ -77,7 +84,7 @@ export const ClinicalVideoShowcase: React.FC = () => {
       currentVideo.play().then(() => {
         setPlayingId(id);
       }).catch(() => {
-        // Handle autoplay policy block gracefully
+        // Handle autoplay block
       });
     }
   };
@@ -96,8 +103,8 @@ export const ClinicalVideoShowcase: React.FC = () => {
     if (video) {
       if (video.requestFullscreen) {
         video.requestFullscreen();
-      } else if ((video as any).webkitRequestFullscreen) {
-        (video as any).webkitRequestFullscreen();
+      } else if ((video as unknown as { webkitRequestFullscreen?: () => void }).webkitRequestFullscreen) {
+        (video as unknown as { webkitRequestFullscreen: () => void }).webkitRequestFullscreen();
       }
     }
   };
@@ -133,19 +140,27 @@ export const ClinicalVideoShowcase: React.FC = () => {
               >
                 {/* Video Container */}
                 <div className="relative aspect-video rounded-2xl overflow-hidden bg-[#181613] group shadow-inner">
-                  <video
-                    ref={(el) => (videoRefs.current[vid.id] = el)}
-                    src={vid.src}
-                    poster={vid.poster}
-                    muted={isMuted}
-                    playsInline
-                    preload="metadata"
-                    onEnded={() => setPlayingId(null)}
-                    onPause={() => {
-                      if (playingId === vid.id) setPlayingId(null);
-                    }}
-                    className="w-full h-full object-cover"
-                  />
+                  {isOnline ? (
+                    <video
+                      ref={(el) => (videoRefs.current[vid.id] = el)}
+                      src={vid.src}
+                      poster={vid.poster}
+                      muted={isMuted}
+                      playsInline
+                      preload="metadata"
+                      onEnded={() => setPlayingId(null)}
+                      onPause={() => {
+                        if (playingId === vid.id) setPlayingId(null);
+                      }}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <img
+                      src={vid.poster}
+                      alt={vid.title}
+                      className="w-full h-full object-cover opacity-80 filter brightness-90"
+                    />
+                  )}
 
                   {/* Top Badge */}
                   <div className="absolute top-3 left-3 bg-[#181613]/80 backdrop-blur-md text-[#D8C5A5] text-[11px] font-semibold px-3 py-1 rounded-full border border-white/10 flex items-center gap-1.5 shadow-md">
@@ -153,42 +168,60 @@ export const ClinicalVideoShowcase: React.FC = () => {
                     <span>{vid.badge}</span>
                   </div>
 
-                  {/* Custom Play/Pause Overlay Button (Min 44x44px target) */}
-                  <button
-                    onClick={() => handlePlayToggle(vid.id)}
-                    type="button"
-                    className="absolute inset-0 m-auto w-16 h-16 rounded-full bg-[#B08D57]/90 hover:bg-[#B08D57] text-white flex items-center justify-center shadow-2xl transition-transform transform group-hover:scale-105 focus:outline-none focus:ring-4 focus:ring-[#D8C5A5]"
-                    aria-label={isPlaying ? `Pausar vídeo ${vid.title}` : `Reproduzir vídeo ${vid.title}`}
-                  >
-                    {isPlaying ? (
-                      <Pause size={28} fill="white" />
-                    ) : (
-                      <Play size={28} fill="white" className="ml-1" />
-                    )}
-                  </button>
+                  {/* Offline Notice or Play Button */}
+                  {!isOnline ? (
+                    <div className="absolute inset-0 bg-black/60 backdrop-blur-xs flex flex-col items-center justify-center p-4 text-center space-y-2">
+                      <WifiOff size={24} className="text-amber-400" />
+                      <p className="text-xs text-[#E5DEC9] max-w-xs font-medium">
+                        O vídeo estará disponível quando a conexão retornar.
+                      </p>
+                      <button
+                        onClick={() => window.location.reload()}
+                        type="button"
+                        className="mt-1 inline-flex items-center gap-1.5 bg-[#B08D57] hover:bg-[#977747] text-white text-xs font-semibold py-1.5 px-3 rounded-full shadow-md transition-colors"
+                      >
+                        <RefreshCw size={12} />
+                        <span>Tentar novamente</span>
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <button
+                        onClick={() => handlePlayToggle(vid.id)}
+                        type="button"
+                        className="absolute inset-0 m-auto w-16 h-16 rounded-full bg-[#B08D57]/90 hover:bg-[#B08D57] text-white flex items-center justify-center shadow-2xl transition-transform transform group-hover:scale-105 focus:outline-none focus:ring-4 focus:ring-[#D8C5A5]"
+                        aria-label={isPlaying ? `Pausar vídeo ${vid.title}` : `Reproduzir vídeo ${vid.title}`}
+                      >
+                        {isPlaying ? (
+                          <Pause size={28} fill="white" />
+                        ) : (
+                          <Play size={28} fill="white" className="ml-1" />
+                        )}
+                      </button>
 
-                  {/* Bottom Video Quick Action Bar */}
-                  <div className="absolute bottom-3 right-3 flex items-center gap-2">
-                    <button
-                      onClick={() => handleMuteToggle(vid.id)}
-                      type="button"
-                      className="w-9 h-9 rounded-full bg-[#181613]/80 hover:bg-[#181613] text-white flex items-center justify-center backdrop-blur-md border border-white/15 transition-all"
-                      aria-label={isMuted ? 'Ativar som' : 'Desativar som'}
-                      title={isMuted ? 'Ativar som' : 'Desativar som'}
-                    >
-                      {isMuted ? <VolumeX size={16} /> : <Volume2 size={16} />}
-                    </button>
+                      <div className="absolute bottom-3 right-3 flex items-center gap-2">
+                        <button
+                          onClick={() => handleMuteToggle(vid.id)}
+                          type="button"
+                          className="w-9 h-9 rounded-full bg-[#181613]/80 hover:bg-[#181613] text-white flex items-center justify-center backdrop-blur-md border border-white/15 transition-all"
+                          aria-label={isMuted ? 'Ativar som' : 'Desativar som'}
+                          title={isMuted ? 'Ativar som' : 'Desativar som'}
+                        >
+                          {isMuted ? <VolumeX size={16} /> : <Volume2 size={16} />}
+                        </button>
 
-                    <button
-                      onClick={() => handleFullscreen(vid.id)}
-                      type="button"
-                      className="w-9 h-9 rounded-full bg-[#181613]/80 hover:bg-[#181613] text-white flex items-center justify-center backdrop-blur-md border border-white/15 transition-all"
-                      aria-label="Expandir vídeo em tela cheia"
-                      title="Tela cheia"
-                    >
-                      <Maximize2 size={16} />
-                    </button>
-                  </div>
+                        <button
+                          onClick={() => handleFullscreen(vid.id)}
+                          type="button"
+                          className="w-9 h-9 rounded-full bg-[#181613]/80 hover:bg-[#181613] text-white flex items-center justify-center backdrop-blur-md border border-white/15 transition-all"
+                          aria-label="Expandir vídeo em tela cheia"
+                          title="Tela cheia"
+                        >
+                          <Maximize2 size={16} />
+                        </button>
+                      </div>
+                    </>
+                  )}
                 </div>
 
                 {/* Card Info */}

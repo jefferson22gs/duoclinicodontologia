@@ -1,12 +1,14 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { mediaAssets } from '../data/mediaAssets';
-import { Compass, Pause, Play, Sparkles } from 'lucide-react';
+import { Compass, Pause, Play, WifiOff } from 'lucide-react';
+import { useOnlineStatus } from '../hooks/useOnlineStatus';
 
 export const GlobalTourBackground: React.FC = () => {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const rafId = useRef<number | null>(null);
-  const lastTimeRef = useRef<number>(0);
+
+  const { isOnline } = useOnlineStatus();
 
   const [isLoaded, setIsLoaded] = useState(false);
   const [hasError, setHasError] = useState(false);
@@ -25,8 +27,7 @@ export const GlobalTourBackground: React.FC = () => {
     const handleMotionChange = (e: MediaQueryListEvent) => setPrefersReducedMotion(e.matches);
     motionQuery.addEventListener('change', handleMotionChange);
 
-    // Check navigator connection saveData
-    if ('connection' in navigator && (navigator as any).connection?.saveData) {
+    if ('connection' in navigator && (navigator as unknown as { connection?: { saveData?: boolean } }).connection?.saveData) {
       setSaveData(true);
     }
 
@@ -44,7 +45,7 @@ export const GlobalTourBackground: React.FC = () => {
   // Synchronize whole page scroll with video currentTime
   const syncScrollToVideo = useCallback(() => {
     const video = videoRef.current;
-    if (!video || !video.duration || isNaN(video.duration) || isPausedByUser || prefersReducedMotion || saveData) {
+    if (!video || !video.duration || isNaN(video.duration) || isPausedByUser || prefersReducedMotion || saveData || !isOnline) {
       return;
     }
 
@@ -58,19 +59,16 @@ export const GlobalTourBackground: React.FC = () => {
 
     const targetTime = clampedProgress * (video.duration - 0.1);
 
-    // Only set currentTime if difference is noticeable (> 0.04s) to avoid micro-stuttering
     if (Math.abs(video.currentTime - targetTime) > 0.04) {
       video.currentTime = targetTime;
     }
 
-    // Throttled UI state updates for progress indicator
     if (Math.abs(clampedProgress - progress) > 0.01) {
       setProgress(clampedProgress);
       setCurrentTimeFormatted(formatTime(targetTime));
     }
-  }, [isPausedByUser, prefersReducedMotion, saveData, progress]);
+  }, [isPausedByUser, prefersReducedMotion, saveData, progress, isOnline]);
 
-  // RequestAnimationFrame loop on scroll / resize
   useEffect(() => {
     const loop = () => {
       syncScrollToVideo();
@@ -84,7 +82,6 @@ export const GlobalTourBackground: React.FC = () => {
     };
   }, [syncScrollToVideo]);
 
-  // Handle Video Metadata Loaded
   const handleLoadedMetadata = () => {
     const video = videoRef.current;
     if (video) {
@@ -115,9 +112,8 @@ export const GlobalTourBackground: React.FC = () => {
       />
 
       {/* Main Single Tour Video Instance */}
-      {!hasError && !prefersReducedMotion && !saveData ? (
+      {isOnline && !hasError && !prefersReducedMotion && !saveData ? (
         <div className="absolute inset-0 flex items-center justify-center">
-          {/* Desktop Portal Framing with Soft Gradient Masking */}
           <div className="relative w-full h-full max-w-[760px] md:w-[clamp(480px,46vw,760px)] mx-auto flex items-center justify-center">
             <video
               ref={videoRef}
@@ -140,7 +136,7 @@ export const GlobalTourBackground: React.FC = () => {
           </div>
         </div>
       ) : (
-        /* Fallback Static Poster Image */
+        /* Fallback Static Poster Image when offline or error */
         <img
           src={mediaAssets.clinic.recepcaoPrincipal}
           alt=""
@@ -148,41 +144,46 @@ export const GlobalTourBackground: React.FC = () => {
         />
       )}
 
-      {/* Global Atmosphere Lighting & Radial Champagne Scrims */}
+      {/* Global Atmosphere Lighting & Radial Scrims */}
       <div className="absolute inset-0 bg-gradient-to-b from-[#181613]/80 via-transparent to-[#181613]/90 pointer-events-none" />
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_transparent_30%,_rgba(24,22,19,0.65)_100%)] pointer-events-none" />
-
-      {/* Subtle Noise / Texture Glow Layer */}
       <div className="absolute inset-0 bg-gradient-to-tr from-[#B08D57]/10 via-transparent to-[#D8C5A5]/10 pointer-events-none mix-blend-overlay" />
 
-      {/* Discrete Interactive Controls (Fixed Pointer Events Enabled on Control Badges) */}
+      {/* Discrete Interactive Controls & Offline Video Badge */}
       <div className="absolute bottom-6 right-6 z-20 pointer-events-auto flex items-center gap-3">
-        {/* Toggle Pause / Resume Motion Button */}
-        <button
-          onClick={toggleUserPause}
-          type="button"
-          className="bg-[#1D1D1B]/80 hover:bg-[#1D1D1B] text-[#D8C5A5] hover:text-white px-3.5 py-2 rounded-full text-xs font-semibold backdrop-blur-md border border-white/15 shadow-xl transition-all flex items-center gap-2"
-          title={isPausedByUser ? 'Retomar animação no fundo' : 'Pausar animação no fundo'}
-          aria-label={isPausedByUser ? 'Retomar fundo animado' : 'Pausar fundo animado'}
-        >
-          {isPausedByUser ? (
-            <>
-              <Play size={13} fill="currentColor" />
-              <span className="hidden sm:inline">Retomar Fundo</span>
-            </>
-          ) : (
-            <>
-              <Pause size={13} fill="currentColor" />
-              <span className="hidden sm:inline">Pausar Fundo</span>
-            </>
-          )}
-        </button>
+        {!isOnline ? (
+          <div className="flex items-center gap-2 bg-[#1D1D1B]/90 px-3.5 py-2 rounded-full text-xs text-[#D8C5A5] backdrop-blur-md border border-[#B08D57]/30 shadow-xl">
+            <WifiOff size={14} className="text-amber-400" />
+            <span>O vídeo estará disponível quando a conexão retornar.</span>
+          </div>
+        ) : (
+          <>
+            <button
+              onClick={toggleUserPause}
+              type="button"
+              className="bg-[#1D1D1B]/80 hover:bg-[#1D1D1B] text-[#D8C5A5] hover:text-white px-3.5 py-2 rounded-full text-xs font-semibold backdrop-blur-md border border-white/15 shadow-xl transition-all flex items-center gap-2"
+              title={isPausedByUser ? 'Retomar animação no fundo' : 'Pausar animação no fundo'}
+              aria-label={isPausedByUser ? 'Retomar fundo animado' : 'Pausar fundo animado'}
+            >
+              {isPausedByUser ? (
+                <>
+                  <Play size={13} fill="currentColor" />
+                  <span className="hidden sm:inline">Retomar Fundo</span>
+                </>
+              ) : (
+                <>
+                  <Pause size={13} fill="currentColor" />
+                  <span className="hidden sm:inline">Pausar Fundo</span>
+                </>
+              )}
+            </button>
 
-        {/* Discrete Time / Progress Tag */}
-        <div className="hidden md:flex items-center gap-2 bg-[#1D1D1B]/80 px-3.5 py-2 rounded-full text-[11px] font-mono text-[#D8C5A5] backdrop-blur-md border border-white/15 shadow-xl">
-          <Compass size={13} className="text-[#B08D57]" />
-          <span>TOUR DUOCLINIC • {currentTimeFormatted} / {durationFormatted}</span>
-        </div>
+            <div className="hidden md:flex items-center gap-2 bg-[#1D1D1B]/80 px-3.5 py-2 rounded-full text-[11px] font-mono text-[#D8C5A5] backdrop-blur-md border border-white/15 shadow-xl">
+              <Compass size={13} className="text-[#B08D57]" />
+              <span>TOUR DUOCLINIC • {currentTimeFormatted} / {durationFormatted}</span>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
